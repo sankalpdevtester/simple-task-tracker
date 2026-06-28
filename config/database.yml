@@ -1,0 +1,21 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  host: <%= ENV['DATABASE_HOST'] %>
+  port: <%= ENV['DATABASE_PORT'] %>
+  username: <%= ENV['DATABASE_USERNAME'] %>
+  password: <%= ENV['DATABASE_PASSWORD'] %>
+
+development:
+  <<: *default
+  database: task_tracker_development
+
+test:
+  <<: *default
+  database: task_tracker_test
+
+production:
+  <<: *default
+  database: task_tracker_production
+  username: task_tracker
+  password: <%= ENV['TASK_TRACKER_DATABASE_PASSWORD'] %>
