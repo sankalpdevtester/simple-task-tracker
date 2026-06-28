@@ -1,0 +1,23 @@
+{
+  "name": "task-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@babel/runtime": "^7.20.5",
+    "@hotwired/stimulus": "^3.1.1",
+    "@hotwired/turbo": "^7.2.4",
+    "@rails/actioncable": "^7.0.4",
+    "@rails/activestorage": "^7.0.4",
+    "@rails/ujs": "^7.0.4",
+    "@rails/webpacker": "^5.4.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-rails": "^2.6.2",
+    "stimulus": "^1.1.1",
+    "turbo": "^1.1.1"
+  },
+  "scripts": {
+    "build": "rails webpacker:compile",
+    "webpack": "rails webpacker:compile"
+  }
+}
