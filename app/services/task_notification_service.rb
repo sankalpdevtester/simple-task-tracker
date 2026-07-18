@@ -19,12 +19,12 @@ class TaskNotificationService
   end
 
   def send_update_notification
-    # Send a notification email to the task owner when the task is updated
+    # Send a notification email when the task is updated
     TaskMailer.update_notification(@task).deliver_now
   end
 
   def send_completion_notification
-    # Send a notification email to the task owner when the task is completed
+    # Send a notification email when the task is completed
     TaskMailer.completion_notification(@task).deliver_now
   end
 end
@@ -41,17 +41,17 @@ end
 class TaskMailer < ApplicationMailer
   def reminder(task)
     @task = task
-    mail to: @task.user.email, subject: "Reminder: #{@task.title}"
+    mail to: task.user.email, subject: "Reminder: #{@task.name}"
   end
 
   def update_notification(task)
     @task = task
-    mail to: @task.user.email, subject: "Task updated: #{@task.title}"
+    mail to: task.user.email, subject: "Task updated: #{@task.name}"
   end
 
   def completion_notification(task)
     @task = task
-    mail to: @task.user.email, subject: "Task completed: #{@task.title}"
+    mail to: task.user.email, subject: "Task completed: #{@task.name}"
   end
 end
 ```
@@ -59,17 +59,33 @@ end
 ```ruby
 # app/controllers/tasks_controller.rb (updated)
 class TasksController < ApplicationController
-  # ...
+  before_action :set_task, only: %i[update destroy]
 
   def update
-    # ...
-    TaskNotificationService.new(@task).send_update_notification
-    # ...
+    if @task.update(task_params)
+      TaskNotificationService.new(@task).send_update_notification
+      render json: @task, status: :ok
+    else
+      render json: @task.errors, status: :unprocessable_entity
+    end
   end
 
-  def complete
-    # ...
-    TaskNotificationService.new(@task).send_completion_notification
-    # ...
+  def destroy
+    if @task.destroy
+      TaskNotificationService.new(@task).send_completion_notification
+      head :no_content
+    else
+      render json: @task.errors, status: :unprocessable_entity
+    end
+  end
+
+  private
+
+  def set_task
+    @task = Task.find(params[:id])
+  end
+
+  def task_params
+    params.require(:task).permit(:name, :description, :reminder_at)
   end
 end
