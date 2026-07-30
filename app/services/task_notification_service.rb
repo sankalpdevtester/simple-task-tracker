@@ -6,20 +6,36 @@ class TaskNotificationService
   end
 
   def send_reminder
-    return unless @task.due_date && @task.user
+    # Send reminder email to user
+    TaskMailer.reminder(@task).deliver_now
+  end
 
-    # Calculate the time until the task is due
-    time_until_due = (@task.due_date - Time.current)
+  def send_update
+    # Send update email to user
+    TaskMailer.update(@task).deliver_now
+  end
 
-    # Send a reminder if the task is due within the next 24 hours
-    if time_until_due <= 24.hours
-      TaskMailer.reminder(@task).deliver_now
+  def send_notification
+    # Send notification to user based on task status
+    case @task.status
+    when 'pending'
+      send_reminder
+    when 'completed'
+      send_update
     end
   end
 
   def self.send_daily_reminders
-    Task.where("due_date <= ?", Time.current + 1.day).each do |task|
+    # Send daily reminders for pending tasks
+    Task.where(status: 'pending').each do |task|
       TaskNotificationService.new(task).send_reminder
+    end
+  end
+
+  def self.send_daily_updates
+    # Send daily updates for completed tasks
+    Task.where(status: 'completed').each do |task|
+      TaskNotificationService.new(task).send_update
     end
   end
 end
@@ -30,7 +46,29 @@ end
 class TaskMailer < ApplicationMailer
   def reminder(task)
     @task = task
-    mail to: task.user.email, subject: "Task Reminder: #{@task.title}"
+    mail to: task.user.email, subject: 'Task Reminder'
+  end
+
+  def update(task)
+    @task = task
+    mail to: task.user.email, subject: 'Task Update'
+  end
+end
+```
+
+```ruby
+# app/controllers/tasks_controller.rb (updated)
+class TasksController < ApplicationController
+  def create
+    # ...
+    TaskNotificationService.new(@task).send_notification
+    # ...
+  end
+
+  def update
+    # ...
+    TaskNotificationService.new(@task).send_notification
+    # ...
   end
 end
 ```
@@ -41,23 +79,6 @@ Rails.application.configure do
   # ...
   config.after_initialize do
     TaskNotificationService.send_daily_reminders
-  end
-end
-```
-
-```ruby
-# app/controllers/tasks_controller.rb (updated)
-class TasksController < ApplicationController
-  # ...
-  def create
-    # ...
-    TaskNotificationService.new(@task).send_reminder
-    # ...
-  end
-
-  def update
-    # ...
-    TaskNotificationService.new(@task).send_reminder
-    # ...
+    TaskNotificationService.send_daily_updates
   end
 end
