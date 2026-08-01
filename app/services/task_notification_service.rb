@@ -6,79 +6,44 @@ class TaskNotificationService
   end
 
   def send_reminder
-    # Send reminder email to user
-    TaskMailer.reminder(@task).deliver_now
-  end
+    return unless @task.due_date && @task.user
 
-  def send_update
-    # Send update email to user
-    TaskMailer.update(@task).deliver_now
-  end
-
-  def send_notification
-    # Send notification to user based on task status
-    case @task.status
-    when 'pending'
-      send_reminder
-    when 'completed'
-      send_update
-    end
+    TaskMailer.with(task: @task).reminder_email.deliver_later
   end
 
   def self.send_daily_reminders
-    # Send daily reminders for pending tasks
-    Task.where(status: 'pending').each do |task|
-      TaskNotificationService.new(task).send_reminder
-    end
-  end
-
-  def self.send_daily_updates
-    # Send daily updates for completed tasks
-    Task.where(status: 'completed').each do |task|
-      TaskNotificationService.new(task).send_update
+    Task.where("due_date <= ?", Date.today).each do |task|
+      new(task).send_reminder
     end
   end
 end
-```
 
-```ruby
-# app/mailers/task_mailer.rb (updated)
-class TaskMailer < ApplicationMailer
-  def reminder(task)
-    @task = task
-    mail to: task.user.email, subject: 'Task Reminder'
-  end
-
-  def update(task)
-    @task = task
-    mail to: task.user.email, subject: 'Task Update'
-  end
-end
-```
-
-```ruby
-# app/controllers/tasks_controller.rb (updated)
+# Usage in tasks_controller.rb
 class TasksController < ApplicationController
   def create
     # ...
-    TaskNotificationService.new(@task).send_notification
-    # ...
-  end
-
-  def update
-    # ...
-    TaskNotificationService.new(@task).send_notification
+    TaskNotificationService.new(@task).send_reminder
     # ...
   end
 end
-```
 
-```ruby
-# config/environments.rb (updated)
-Rails.application.configure do
-  # ...
-  config.after_initialize do
-    TaskNotificationService.send_daily_reminders
-    TaskNotificationService.send_daily_updates
+# Usage in task_mailer.rb
+class TaskMailer < ApplicationMailer
+  def reminder_email
+    @task = params[:task]
+    mail to: @task.user.email, subject: "Task Reminder: #{@task.title}"
   end
+end
+
+# Usage in task_reminder_service.rb
+class TaskReminderService
+  def self.send_reminders
+    TaskNotificationService.send_daily_reminders
+  end
+end
+
+# Add a cron job to run daily reminders
+# config/schedule.rb
+every 1.day, at: '8:00 am' do
+  runner "TaskNotificationService.send_daily_reminders"
 end
