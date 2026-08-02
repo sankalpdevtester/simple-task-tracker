@@ -6,44 +6,54 @@ class TaskNotificationService
   end
 
   def send_reminder
-    return unless @task.due_date && @task.user
+    # Check if task has a due date and is not completed
+    return unless @task.due_date && !@task.completed
 
-    TaskMailer.with(task: @task).reminder_email.deliver_later
-  end
+    # Calculate time until due date
+    time_until_due = (@task.due_date - Time.current).to_i
 
-  def self.send_daily_reminders
-    Task.where("due_date <= ?", Date.today).each do |task|
-      new(task).send_reminder
+    # Send reminder if due date is within 24 hours
+    if time_until_due <= 24.hours
+      TaskMailer.reminder(@task).deliver_now
     end
   end
+
+  def send_update_notification(user)
+    # Send notification to user when task is updated
+    TaskMailer.update_notification(@task, user).deliver_now
+  end
+
+  def send_completion_notification(user)
+    # Send notification to user when task is completed
+    TaskMailer.completion_notification(@task, user).deliver_now
+  end
 end
 
-# Usage in tasks_controller.rb
+# Usage example in tasks_controller.rb
 class TasksController < ApplicationController
-  def create
-    # ...
-    TaskNotificationService.new(@task).send_reminder
-    # ...
+  def update
+    @task = Task.find(params[:id])
+    if @task.update(task_params)
+      TaskNotificationService.new(@task).send_update_notification(current_user)
+      render json: @task
+    else
+      render json: @task.errors
+    end
+  end
+
+  def complete
+    @task = Task.find(params[:id])
+    @task.update(completed: true)
+    TaskNotificationService.new(@task).send_completion_notification(current_user)
+    render json: @task
   end
 end
 
-# Usage in task_mailer.rb
-class TaskMailer < ApplicationMailer
-  def reminder_email
-    @task = params[:task]
-    mail to: @task.user.email, subject: "Task Reminder: #{@task.title}"
-  end
-end
-
-# Usage in task_reminder_service.rb
+# Usage example in task_reminder_service.rb
 class TaskReminderService
-  def self.send_reminders
-    TaskNotificationService.send_daily_reminders
+  def send_reminders
+    Task.all.each do |task|
+      TaskNotificationService.new(task).send_reminder
+    end
   end
-end
-
-# Add a cron job to run daily reminders
-# config/schedule.rb
-every 1.day, at: '8:00 am' do
-  runner "TaskNotificationService.send_daily_reminders"
 end
